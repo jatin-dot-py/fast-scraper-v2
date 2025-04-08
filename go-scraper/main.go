@@ -17,23 +17,23 @@ import (
 
 // Result represents a single URL scraping result
 type Result struct {
-	URL           string  `json:"url"`
-	StatusCode    int     `json:"status_code,omitempty"`
-	Content       string  `json:"content,omitempty"`
-	Error         string  `json:"error,omitempty"`
-	ElapsedTime   float64 `json:"elapsed_seconds"`
-	Success       bool    `json:"success"`
-	ProxyUsed     string  `json:"proxy_used"`
+	URL         string  `json:"url"`
+	StatusCode  int     `json:"status_code,omitempty"`
+	Content     string  `json:"content,omitempty"`
+	Error       string  `json:"error,omitempty"`
+	ElapsedTime float64 `json:"elapsed_seconds"`
+	Success     bool    `json:"success"`
+	ProxyUsed   string  `json:"proxy_used"`
 }
 
 // Response represents the overall response from the scraper
 type Response struct {
-	Results        []Result `json:"results"`
-	Total          int      `json:"total"`
-	Successful     int      `json:"successful"`
-	Failed         int      `json:"failed"`
-	TotalTimeSeconds float64 `json:"total_time_seconds"`
-	ProxyTypeUsed  string   `json:"proxy_type_used"`
+	Results          []Result `json:"results"`
+	Total            int      `json:"total"`
+	Successful       int      `json:"successful"`
+	Failed           int      `json:"failed"`
+	TotalTimeSeconds float64  `json:"total_time_seconds"`
+	ProxyTypeUsed    string   `json:"proxy_type_used"`
 }
 
 var userAgents = []string{
@@ -47,9 +47,9 @@ func main() {
 	urlsFlag := flag.String("urls", "", "Comma-separated list of URLs to scrape")
 	proxiesFlag := flag.String("proxies", "", "Comma-separated list of proxies to use")
 	proxyTypeFlag := flag.String("proxy-type", "datacenter", "Type of proxy (datacenter, residential, etc.)")
-	timeoutFlag := flag.Int("timeout", 10, "Timeout in seconds for each request")
-	maxRetriesFlag := flag.Int("max-retries", 3, "Maximum number of retries for each URL")
-	
+	timeoutFlag := flag.Int("timeout", 5, "Timeout in seconds for each request")
+	maxRetriesFlag := flag.Int("max-retries", 1, "Maximum number of retries for each URL")
+
 	flag.Parse()
 
 	// Split URLs
@@ -118,38 +118,38 @@ func main() {
 func scrapeURLs(urls []string, proxies []string, proxyType string, timeout int, maxRetries int) []Result {
 	// Create a wait group to track goroutines
 	var wg sync.WaitGroup
-	
+
 	// Create a channel to collect results
 	resultsChan := make(chan Result, len(urls))
-	
+
 	// Process each URL concurrently
 	for _, url := range urls {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			
+
 			// Scrape the URL with retries
 			result := scrapeURL(url, proxies, proxyType, timeout, maxRetries)
 			resultsChan <- result
 		}(url)
 	}
-	
+
 	// Wait for all goroutines to complete
 	wg.Wait()
 	close(resultsChan)
-	
+
 	// Collect results from channel
 	var results []Result
 	for result := range resultsChan {
 		results = append(results, result)
 	}
-	
+
 	return results
 }
 
 func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int, maxRetries int) Result {
 	startTime := time.Now()
-	
+
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		// Create a custom HTTP client
 		client := &http.Client{
@@ -161,22 +161,20 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 				MaxIdleConns:          100,
 				MaxIdleConnsPerHost:   10,
 				MaxConnsPerHost:       10,
-				IdleConnTimeout:       30 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
+				IdleConnTimeout:       5 * time.Second,
+				TLSHandshakeTimeout:   5 * time.Second,
 				ExpectContinueTimeout: 1 * time.Second,
 				DisableKeepAlives:     false,
 			},
 		}
-		
+
 		// Apply proxy if available
-		var proxyUsed string
 		if len(proxies) > 0 {
 			// Select a random proxy
-			proxy := proxies[rand.Intn(len(proxies))]
-			proxyUsed = proxy
-			
+			proxyStr := proxies[rand.Intn(len(proxies))]
+
 			// Set up proxy URL
-			proxyURL, err := url.Parse(proxy)
+			proxyURL, err := url.Parse(proxyStr)
 			if err == nil {
 				client.Transport.(*http.Transport).Proxy = http.ProxyURL(proxyURL)
 			} else {
@@ -184,26 +182,26 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 				continue
 			}
 		}
-		
+
 		// Create request
 		req, err := http.NewRequest("GET", targetURL, nil)
 		if err != nil {
 			continue
 		}
-		
+
 		// Set random user agent
 		req.Header.Set("User-Agent", userAgents[rand.Intn(len(userAgents))])
-		
+
 		// Perform request
 		resp, err := client.Do(req)
-		
+
 		// Handle errors
 		if err != nil {
 			// Try again if not the last attempt
 			if attempt < maxRetries-1 {
 				continue
 			}
-			
+
 			// Return error on last attempt
 			return Result{
 				URL:         targetURL,
@@ -213,7 +211,7 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 				ProxyUsed:   proxyType,
 			}
 		}
-		
+
 		// Read response body
 		defer resp.Body.Close()
 		bodyBytes, err := io.ReadAll(resp.Body)
@@ -222,7 +220,7 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 			if attempt < maxRetries-1 {
 				continue
 			}
-			
+
 			// Return error on last attempt
 			return Result{
 				URL:         targetURL,
@@ -233,7 +231,7 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 				ProxyUsed:   proxyType,
 			}
 		}
-		
+
 		// Success case
 		return Result{
 			URL:         targetURL,
@@ -244,7 +242,7 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 			ProxyUsed:   proxyType,
 		}
 	}
-	
+
 	// This should never happen, but added for completeness
 	return Result{
 		URL:         targetURL,

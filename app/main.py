@@ -23,8 +23,8 @@ app = FastAPI()
 class ScrapeRequest(BaseModel):
     urls: List[str]
     proxy_type: str = "datacenter"  # Default to datacenter proxies
-    timeout: int = 10
-    max_retries: int = 3
+    timeout: int = 5
+    max_retries: int = 1
 
 def get_proxy_list() -> List[str]:
     """Get datacenter proxies from environment variable."""

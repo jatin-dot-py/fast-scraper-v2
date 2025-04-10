@@ -155,7 +155,6 @@ func scrapeURLs(urls []string, proxies []string, proxyType string, timeout int, 
 func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int, maxRetries int) Result {
 	startTime := time.Now()
 	var detailedErrorBuilder strings.Builder
-	var lastErr error
 	var selectedProxy string
 	attemptsMade := 0
 
@@ -201,7 +200,6 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 			proxyURL, err := url.Parse(selectedProxy)
 			if err != nil {
 				fmt.Fprintf(&detailedErrorBuilder, "Error parsing proxy URL: %v\n", err)
-				lastErr = err
 				continue
 			}
 			client.Transport.(*http.Transport).Proxy = http.ProxyURL(proxyURL)
@@ -213,7 +211,6 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 		req, err := http.NewRequest("GET", targetURL, nil)
 		if err != nil {
 			fmt.Fprintf(&detailedErrorBuilder, "Error creating request: %v\n", err)
-			lastErr = err
 			continue
 		}
 
@@ -236,7 +233,6 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 		if err != nil {
 			fmt.Fprintf(&detailedErrorBuilder, "Request error: %v\n", err)
 			fmt.Fprintf(&detailedErrorBuilder, "Attempt %d failed after %s\n\n", attempt+1, time.Since(attemptStartTime))
-			lastErr = err
 
 			// Try again if not the last attempt
 			if attempt < maxRetries-1 {
@@ -277,7 +273,6 @@ func scrapeURL(targetURL string, proxies []string, proxyType string, timeout int
 		if err != nil {
 			fmt.Fprintf(&detailedErrorBuilder, "Error reading response body: %v\n", err)
 			fmt.Fprintf(&detailedErrorBuilder, "Attempt %d failed after %s\n\n", attempt+1, time.Since(attemptStartTime))
-			lastErr = err
 
 			// Try again if not the last attempt
 			if attempt < maxRetries-1 {

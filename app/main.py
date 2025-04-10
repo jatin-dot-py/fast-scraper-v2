@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, validator, root_validator
+from pydantic import BaseModel, field_validator, model_validator
 from typing import Dict, List, Any, Optional
 import logging
 import os
@@ -28,7 +28,8 @@ class ScrapeRequest(BaseModel):
     timeout: int = 5
     max_retries: int = 1
 
-    @validator('timeout')
+    @field_validator('timeout')
+    @classmethod
     def validate_timeout(cls, v):
         if v < 1:
             raise ValueError("Timeout must be at least 1 second")
@@ -36,7 +37,8 @@ class ScrapeRequest(BaseModel):
             raise ValueError("Timeout cannot exceed 60 seconds")
         return v
 
-    @validator('max_retries')
+    @field_validator('max_retries')
+    @classmethod
     def validate_max_retries(cls, v):
         if v < 0:
             raise ValueError("Max retries cannot be negative")
@@ -44,8 +46,9 @@ class ScrapeRequest(BaseModel):
             raise ValueError("Max retries cannot exceed 10")
         return v
 
-    @root_validator
-    def validate_at_least_one_url_type(cls, values):
+    @model_validator(mode='after')
+    def validate_at_least_one_url_type(self):
+        values = self.model_dump()
         # Check if at least one URL list is provided
         if not any(values.get(field) for field in ['datacenter', 'residential', 'mobile']):
             raise ValueError("At least one URL list must be provided")
@@ -58,7 +61,7 @@ class ScrapeRequest(BaseModel):
                     if not url.startswith(('http://', 'https://')):
                         raise ValueError(f"URL '{url}' in {field} must start with http:// or https://")
 
-        return values
+        return self
 
 
 def get_proxy_list(proxy_type: str = "datacenter") -> List[str]:
